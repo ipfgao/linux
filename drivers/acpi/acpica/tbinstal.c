@@ -167,6 +167,7 @@ acpi_tb_install_standard_table(acpi_physical_address address,
 
 	/* Validate and verify a table before installation */
 
+	i = acpi_gbl_root_table_list.current_table_count;
 	status = acpi_tb_verify_temp_table(&new_table_desc, NULL, &i);
 	if (ACPI_FAILURE(status)) {
 		if (status == AE_CTRL_TERMINATE) {

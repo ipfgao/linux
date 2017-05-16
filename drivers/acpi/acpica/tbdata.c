@@ -426,12 +426,18 @@ acpi_status
 acpi_tb_check_duplication(struct acpi_table_desc *table_desc, u32 *table_index)
 {
 	u32 i;
+	u32 max_table_index;
 
 	ACPI_FUNCTION_TRACE(tb_check_duplication);
 
 	/* Check if table is already registered */
 
-	for (i = 0; i < acpi_gbl_root_table_list.current_table_count; ++i) {
+	if (table_index) {
+		max_table_index = *table_index;
+	} else {
+		max_table_index = acpi_gbl_root_table_list.current_table_count;
+	}
+	for (i = 0; i < max_table_index; ++i) {
 		/*
 		 * Check for a table match on the entire table length,
 		 * not just the header.
@@ -551,6 +557,8 @@ acpi_tb_verify_temp_table(struct acpi_table_desc *table_desc,
 				goto invalidate_and_exit;
 			}
 		}
+
+		table_desc->flags |= ACPI_TABLE_IS_VERIFIED;
 	}
 
 	return_ACPI_STATUS(status);
@@ -576,6 +584,8 @@ acpi_status acpi_tb_resize_root_table_list(void)
 {
 	struct acpi_table_desc *tables;
 	u32 table_count;
+	u32 current_table_count, max_table_count;
+	u32 i;
 
 	ACPI_FUNCTION_TRACE(tb_resize_root_table_list);
 
@@ -595,8 +605,8 @@ acpi_status acpi_tb_resize_root_table_list(void)
 		table_count = acpi_gbl_root_table_list.current_table_count;
 	}
 
-	tables = ACPI_ALLOCATE_ZEROED(((acpi_size)table_count +
-				       ACPI_ROOT_TABLE_SIZE_INCREMENT) *
+	max_table_count = table_count + ACPI_ROOT_TABLE_SIZE_INCREMENT;
+	tables = ACPI_ALLOCATE_ZEROED(((acpi_size)max_table_count) *
 				      sizeof(struct acpi_table_desc));
 	if (!tables) {
 		ACPI_ERROR((AE_INFO,
@@ -606,9 +616,16 @@ acpi_status acpi_tb_resize_root_table_list(void)
 
 	/* Copy and free the previous table array */
 
+	current_table_count = 0;
 	if (acpi_gbl_root_table_list.tables) {
-		memcpy(tables, acpi_gbl_root_table_list.tables,
-		       (acpi_size)table_count * sizeof(struct acpi_table_desc));
+		for (i = 0; i < table_count; i++) {
+			if (acpi_gbl_root_table_list.tables[i].address) {
+				memcpy(tables + current_table_count,
+				       acpi_gbl_root_table_list.tables + i,
+				       sizeof(struct acpi_table_desc));
+				current_table_count++;
+			}
+		}
 
 		if (acpi_gbl_root_table_list.flags & ACPI_ROOT_ORIGIN_ALLOCATED) {
 			ACPI_FREE(acpi_gbl_root_table_list.tables);
@@ -616,8 +633,8 @@ acpi_status acpi_tb_resize_root_table_list(void)
 	}
 
 	acpi_gbl_root_table_list.tables = tables;
-	acpi_gbl_root_table_list.max_table_count =
-	    table_count + ACPI_ROOT_TABLE_SIZE_INCREMENT;
+	acpi_gbl_root_table_list.max_table_count = max_table_count;
+	acpi_gbl_root_table_list.current_table_count = current_table_count;
 	acpi_gbl_root_table_list.flags |= ACPI_ROOT_ORIGIN_ALLOCATED;
 
 	return_ACPI_STATUS(AE_OK);
